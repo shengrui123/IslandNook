@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>IslandNook</string>
+  <key>CFBundleIdentifier</key><string>com.islandnook.mac</string>
+  <key>CFBundleName</key><string>IslandNook</string>
+  <key>CFBundleDisplayName</key><string>IslandNook</string>
+  <key>CFBundleIconFile</key><string>AppIcon.icns</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSCameraUsageDescription</key><string>IslandNook 使用摄像头在灵动岛中提供本地镜像预览。</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>IslandNook 读取未来日程并在灵动岛中展示。</string>
+  <key>NSAppleEventsUsageDescription</key><string>IslandNook 控制 Music 或 Spotify 的播放。</string>
+  <key>NSScreenCaptureUsageDescription</key><string>IslandNook 仅分析系统音频的实时强弱，让音乐波形跟随播放节奏；不会保存屏幕或音频内容。</string>
+</dict></plist>

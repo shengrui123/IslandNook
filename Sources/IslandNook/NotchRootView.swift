@@ -233,24 +233,67 @@ private struct ExpandedNook: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ForEach(NookTab.allCases) { tab in
                 Button {
+                    model.collapseTask?.cancel()
+                    model.tabInteractionCount += 1
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.72)) { model.selectedTab = tab }
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)
                             .font(.system(size: 15, weight: .semibold))
-                            .symbolEffect(.bounce, value: model.selectedTab == tab)
+                            .symbolEffect(.bounce, value: model.selectedTab == tab ? model.tabInteractionCount : 0)
                         Text(tab.rawValue).font(.system(size: 9, weight: .medium))
                     }
-                    .frame(maxWidth: .infinity).padding(.vertical, 7)
-                    .foregroundStyle(model.selectedTab == tab ? .white : .white.opacity(0.42))
-                    .background(model.selectedTab == tab ? accent.opacity(0.27) : .clear, in: RoundedRectangle(cornerRadius: 12))
-                }.buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .contentShape(RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(
+                    NookTabButtonStyle(
+                        accent: accent,
+                        isSelected: model.selectedTab == tab,
+                        isHovered: model.hoveredTab == tab
+                    )
+                )
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.78)) {
+                        if hovering { model.hoveredTab = tab }
+                        else if model.hoveredTab == tab { model.hoveredTab = nil }
+                    }
+                }
             }
         }
-        .padding(5).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 16))
+        .padding(5)
+        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(.white.opacity(0.035), lineWidth: 1))
+    }
+}
+
+private struct NookTabButtonStyle: ButtonStyle {
+    let accent: Color
+    let isSelected: Bool
+    let isHovered: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isSelected ? .white : .white.opacity(isHovered ? 0.72 : 0.42))
+            .background {
+                RoundedRectangle(cornerRadius: 13)
+                    .fill(isSelected ? accent.opacity(configuration.isPressed ? 0.42 : 0.3) : .white.opacity(isHovered ? 0.075 : 0))
+            }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(accent.opacity(isHovered ? 0.48 : 0.22), lineWidth: 1)
+                }
+            }
+            .shadow(color: isSelected ? accent.opacity(0.2) : .clear, radius: isHovered ? 9 : 5, y: 2)
+            .scaleEffect(configuration.isPressed ? 0.93 : (isHovered ? 1.025 : 1))
+            .animation(.spring(response: 0.2, dampingFraction: 0.68), value: configuration.isPressed)
+            .animation(.spring(response: 0.22, dampingFraction: 0.76), value: isHovered)
+            .contentShape(RoundedRectangle(cornerRadius: 13))
     }
 }
 

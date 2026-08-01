@@ -47,6 +47,8 @@ struct QuickApp: Identifiable, Codable, Hashable {
 @MainActor @Observable
 final class AppModel {
     var selectedTab: NookTab = .home
+    var hoveredTab: NookTab?
+    var tabInteractionCount = 0
     var isExpanded = false {
         didSet {
             guard isExpanded != oldValue else { return }

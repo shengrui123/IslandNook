@@ -24,6 +24,8 @@ final class NotchPanelController {
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.isMovable = false
+        panel.isMovableByWindowBackground = false
+        panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = false
         panel.contentView = EdgeToEdgeHostingView(
             rootView: NotchRootView()

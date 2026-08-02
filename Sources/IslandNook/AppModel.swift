@@ -69,6 +69,7 @@ final class AppModel {
     @ObservationIgnored var expansionChanged: ((Bool) -> Void)?
     @ObservationIgnored var compactPresentationChanged: (() -> Void)?
     @ObservationIgnored var modalPresentationChanged: ((Bool) -> Void)?
+    @ObservationIgnored var isPointerInsidePanel: (() -> Bool)?
     let media = MediaController()
     let eventStore = EKEventStore()
 

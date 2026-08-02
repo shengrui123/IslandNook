@@ -79,21 +79,31 @@ struct NotchRootView: View {
             guard expandOnHover else { return }
             model.collapseTask?.cancel()
             if hovering {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.08)) { model.isExpanded = true }
-            } else {
-                model.collapseTask = Task {
-                    try? await Task.sleep(for: .milliseconds(180))
-                    if !Task.isCancelled {
-                        await MainActor.run {
-                            withAnimation(.spring(response: 0.22, dampingFraction: 0.8, blendDuration: 0.04)) {
-                                model.isExpanded = false
-                            }
-                        }
-                    }
+                guard !model.isExpanded else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.08)) {
+                    model.isExpanded = true
                 }
+            } else {
+                scheduleCollapseAfterPointerLeaves()
             }
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.72, blendDuration: 0.08), value: model.isExpanded)
+    }
+
+    private func scheduleCollapseAfterPointerLeaves() {
+        model.collapseTask?.cancel()
+        model.collapseTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(130))
+            guard !Task.isCancelled, model.isExpanded, !model.isFileDropTargeted else { return }
+
+            // NSPanel resizing can briefly invalidate SwiftUI's tracking area and emit a
+            // false hover-exit. Confirm the cursor really left the animated panel first.
+            guard model.isPointerInsidePanel?() != true else { return }
+
+            withAnimation(.spring(response: 0.22, dampingFraction: 0.82, blendDuration: 0.04)) {
+                model.isExpanded = false
+            }
+        }
     }
 
     private func acceptDrop(_ providers: [NSItemProvider]) -> Bool {

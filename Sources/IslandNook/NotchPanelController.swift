@@ -48,6 +48,10 @@ final class NotchPanelController {
                 self.panel.orderFrontRegardless()
             }
         }
+        model.isPointerInsidePanel = { [weak self] in
+            guard let self, self.panel.isVisible else { return false }
+            return self.panel.frame.contains(NSEvent.mouseLocation)
+        }
         screenObserver = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.positionPanel() }
         }

@@ -28,6 +28,21 @@ struct CalendarItem: Identifiable, Hashable {
     let start: Date
     let end: Date
     let color: NSColor
+    let isAllDay: Bool
+
+    var compactScheduleText: String {
+        if isAllDay {
+            return start.formatted(.dateTime.month(.abbreviated).day())
+        }
+        return start.formatted(date: .omitted, time: .shortened)
+    }
+
+    var scheduleText: String {
+        if isAllDay {
+            return start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        }
+        return start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+    }
 }
 
 struct ShelfItem: Identifiable, Codable, Hashable {
@@ -69,7 +84,6 @@ final class AppModel {
     @ObservationIgnored var expansionChanged: ((Bool) -> Void)?
     @ObservationIgnored var compactPresentationChanged: (() -> Void)?
     @ObservationIgnored var modalPresentationChanged: ((Bool) -> Void)?
-    @ObservationIgnored var isPointerInsidePanel: (() -> Bool)?
     let media = MediaController()
     let eventStore = EKEventStore()
 
@@ -161,7 +175,16 @@ final class AppModel {
         events = eventStore.events(matching: predicate)
             .sorted { $0.startDate < $1.startDate }
             .prefix(20)
-            .map { CalendarItem(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "未命名事件", start: $0.startDate, end: $0.endDate, color: NSColor(cgColor: $0.calendar.cgColor) ?? .systemBlue) }
+            .map {
+                CalendarItem(
+                    id: $0.eventIdentifier ?? UUID().uuidString,
+                    title: $0.title ?? "未命名事件",
+                    start: $0.startDate,
+                    end: $0.endDate,
+                    color: NSColor(cgColor: $0.calendar.cgColor) ?? .systemBlue,
+                    isAllDay: $0.isAllDay
+                )
+            }
     }
 
     private func loadPersistedData() {

@@ -1,5 +1,6 @@
 import SwiftUI
 @preconcurrency import AVFoundation
+import QuartzCore
 
 struct MirrorView: View {
     @Environment(AppModel.self) private var model
@@ -60,7 +61,12 @@ private final class CameraPreviewView: NSView {
     required init?(coder: NSCoder) { nil }
     override func layout() {
         super.layout()
-        preview.frame = bounds
+        preview.bounds = bounds
+        preview.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        // The camera driver still presents the opposite horizontal orientation
+        // even when AVCaptureConnection mirroring is disabled. Flip the final
+        // preview once so the displayed result is the reverse of that output.
+        preview.transform = CATransform3DMakeScale(-1, 1, 1)
         disableMirroring()
     }
 

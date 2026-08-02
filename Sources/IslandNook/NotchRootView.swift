@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 struct NotchRootView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("accentName") private var accentName = "紫罗兰"
-    @AppStorage("expandOnHover") private var expandOnHover = true
 
     private var accent: Color {
         switch accentName {
@@ -28,7 +27,7 @@ struct NotchRootView: View {
         VStack(spacing: 0) {
             if model.isExpanded {
                 ExpandedNook(accent: accent)
-                    .transition(.asymmetric(insertion: .scale(scale: 0.86, anchor: .top).combined(with: .opacity), removal: .opacity))
+                    .transition(.asymmetric(insertion: .scale(scale: 0.95, anchor: .top).combined(with: .opacity), removal: .opacity))
             } else {
                 CompactNook(accent: accent)
             }
@@ -75,35 +74,7 @@ struct NotchRootView: View {
             perform: acceptDrop
         )
         .onTapGesture { if !model.isExpanded { model.toggleExpanded() } }
-        .onHover { hovering in
-            guard expandOnHover else { return }
-            model.collapseTask?.cancel()
-            if hovering {
-                guard !model.isExpanded else { return }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.08)) {
-                    model.isExpanded = true
-                }
-            } else {
-                scheduleCollapseAfterPointerLeaves()
-            }
-        }
-        .animation(.spring(response: 0.34, dampingFraction: 0.72, blendDuration: 0.08), value: model.isExpanded)
-    }
-
-    private func scheduleCollapseAfterPointerLeaves() {
-        model.collapseTask?.cancel()
-        model.collapseTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(130))
-            guard !Task.isCancelled, model.isExpanded, !model.isFileDropTargeted else { return }
-
-            // NSPanel resizing can briefly invalidate SwiftUI's tracking area and emit a
-            // false hover-exit. Confirm the cursor really left the animated panel first.
-            guard model.isPointerInsidePanel?() != true else { return }
-
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.82, blendDuration: 0.04)) {
-                model.isExpanded = false
-            }
-        }
+        .animation(.spring(response: 0.2, dampingFraction: 0.84, blendDuration: 0.03), value: model.isExpanded)
     }
 
     private func acceptDrop(_ providers: [NSItemProvider]) -> Bool {

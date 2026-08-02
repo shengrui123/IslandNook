@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
+import Combine
 import EventKit
+import QuickLookThumbnailing
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
@@ -10,7 +12,7 @@ struct HomeView: View {
         HStack(spacing: 12) {
             MediaCard(accent: accent).frame(maxWidth: .infinity)
             VStack(spacing: 10) {
-                MetricCard(icon: "calendar", value: model.events.first.map { $0.start.formatted(date: .omitted, time: .shortened) } ?? "暂无", label: model.events.first?.title ?? "未来日程", accent: .blue, emphasizeLabel: true) { model.selectedTab = .calendar }
+                MetricCard(icon: "calendar", value: model.events.first?.compactScheduleText ?? "暂无", label: model.events.first?.title ?? "未来日程", accent: .blue, emphasizeLabel: true) { model.selectedTab = .calendar }
                 MetricCard(icon: "tray.full.fill", value: "\(model.shelf.count)", label: "中转文件", accent: accent) { model.selectedTab = .shelf }
             }.frame(width: 180)
         }.padding(.vertical, 8)
@@ -150,7 +152,7 @@ struct CalendarView: View {
                                     RoundedRectangle(cornerRadius: 3).fill(Color(nsColor: event.color)).frame(width: 4, height: 38)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(event.title).font(.subheadline.bold()).lineLimit(1)
-                                        Text(event.start, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()).font(.caption).foregroundStyle(.white.opacity(0.5))
+                                        Text(event.scheduleText).font(.caption).foregroundStyle(.white.opacity(0.5))
                                     }
                                     Spacer()
                                 }.padding(10).background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
@@ -206,7 +208,8 @@ private struct ShelfTile: View {
     let item: ShelfItem; let accent: Color
     var body: some View {
         VStack(spacing: 9) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path)).resizable().scaledToFit().frame(width: 62, height: 62)
+            ShelfFilePreview(item: item)
+                .frame(width: 62, height: 62)
             Text(item.name).font(.caption.bold()).lineLimit(2).multilineTextAlignment(.center).frame(width: 104)
             HStack(spacing: 12) {
                 Button { model.open(item) } label: { Image(systemName: "arrow.up.forward.app") }
@@ -215,6 +218,47 @@ private struct ShelfTile: View {
                 Button { model.removeShelfItem(item) } label: { Image(systemName: "xmark") }
             }.buttonStyle(.plain).foregroundStyle(.white.opacity(0.65))
         }.padding(13).frame(width: 130, height: 172).background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+private struct ShelfFilePreview: View {
+    let item: ShelfItem
+    @StateObject private var loader: ShelfThumbnailLoader
+
+    init(item: ShelfItem) {
+        self.item = item
+        _loader = StateObject(wrappedValue: ShelfThumbnailLoader(item: item))
+    }
+
+    var body: some View {
+        Image(nsImage: loader.image)
+            .resizable()
+            .scaledToFit()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+@MainActor
+private final class ShelfThumbnailLoader: ObservableObject {
+    @Published private(set) var image: NSImage
+
+    init(item: ShelfItem) {
+        image = NSWorkspace.shared.icon(forFile: item.path)
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let request = QLThumbnailGenerator.Request(
+            fileAt: item.url,
+            size: CGSize(width: 156, height: 144),
+            scale: scale,
+            representationTypes: [.thumbnail, .icon]
+        )
+        request.iconMode = false
+
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] representation, _ in
+            guard let thumbnail = representation?.nsImage else { return }
+            Task { @MainActor [weak self] in
+                self?.image = thumbnail
+            }
+        }
     }
 }
 

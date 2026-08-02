@@ -29,6 +29,8 @@ final class MediaController {
     @ObservationIgnored let rhythmMonitor = AudioRhythmMonitor()
     private var timer: Timer?
     private var artworkKey = ""
+    private var artworkLoadingKey = ""
+    private var artworkTask: Task<Void, Never>?
     private var lyricsKey = ""
     private var lyricsTask: Task<Void, Never>?
 
@@ -39,7 +41,7 @@ final class MediaController {
         }
     }
 
-    func stop() { timer?.invalidate(); timer = nil; rhythmMonitor.stop(); lyricsTask?.cancel() }
+    func stop() { timer?.invalidate(); timer = nil; rhythmMonitor.stop(); artworkTask?.cancel(); lyricsTask?.cancel() }
 
     var interpolatedPlaybackPosition: Double {
         min(trackDuration, playbackPosition + (isPlaying ? Date().timeIntervalSince(positionUpdatedAt) : 0))
@@ -52,7 +54,7 @@ final class MediaController {
     private func refresh() {
         if update(player: .spotify) { return }
         if update(player: .music) { return }
-        player = nil; title = "未在播放"; artist = "打开 Music 或 Spotify"; album = ""; artwork = nil; artworkColors = ArtworkPalette.fallback; playerIcon = nil; artworkKey = ""; lyricsKey = ""; lyrics = []; lyricsStatus = "播放音乐后显示歌词"; playbackPosition = 0; trackDuration = 0; isPlaying = false
+        player = nil; title = "未在播放"; artist = "打开 Music 或 Spotify"; album = ""; artwork = nil; artworkColors = ArtworkPalette.fallback; playerIcon = nil; artworkKey = ""; artworkLoadingKey = ""; artworkTask?.cancel(); lyricsKey = ""; lyrics = []; lyricsStatus = "播放音乐后显示歌词"; playbackPosition = 0; trackDuration = 0; isPlaying = false
     }
 
     @discardableResult
@@ -143,21 +145,30 @@ final class MediaController {
     }
 
     private func loadRemoteArtwork(_ urlString: String, trackKey: String) {
-        guard artworkKey != trackKey else { return }
-        artworkKey = trackKey
-        artwork = nil
-        guard let url = URL(string: urlString), !urlString.isEmpty else { return }
-        Task { [weak self] in
-            guard let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { return }
-            guard self?.artworkKey == trackKey else { return }
-            self?.setArtwork(image)
+        guard artworkKey != trackKey, artworkLoadingKey != trackKey else { return }
+        prepareArtworkLoad(for: trackKey)
+        guard let url = URL(string: urlString), !urlString.isEmpty else {
+            artworkLoadingKey = ""
+            return
+        }
+        artworkTask = Task { [weak self] in
+            let image: NSImage?
+            if let (data, _) = try? await URLSession.shared.data(from: url) {
+                image = NSImage(data: data)
+            } else {
+                image = nil
+            }
+            guard let self, self.artworkLoadingKey == trackKey else { return }
+            self.artworkLoadingKey = ""
+            guard let image else { return }
+            self.artworkKey = trackKey
+            self.setArtwork(image)
         }
     }
 
     private func loadMusicArtwork(trackKey: String) {
         guard artworkKey != trackKey else { return }
-        artworkKey = trackKey
-        artwork = nil
+        if artworkLoadingKey != trackKey { prepareArtworkLoad(for: trackKey) }
         let script = """
         tell application "Music"
           try
@@ -169,7 +180,16 @@ final class MediaController {
         """
         guard let descriptor = NSAppleScript(source: script)?.executeAndReturnError(nil),
               let image = NSImage(data: descriptor.data) else { return }
+        artworkLoadingKey = ""
+        artworkKey = trackKey
         setArtwork(image)
+    }
+
+    private func prepareArtworkLoad(for trackKey: String) {
+        artworkTask?.cancel()
+        artworkLoadingKey = trackKey
+        artwork = nil
+        artworkColors = ArtworkPalette.fallback
     }
 
     private func setArtwork(_ image: NSImage) {

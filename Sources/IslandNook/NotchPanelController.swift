@@ -184,11 +184,14 @@ final class NotchPanelController {
     }
 
     private func compactPresentationSize(on screen: NSScreen) -> NSSize {
-        let storedWidth = UserDefaults.standard.object(forKey: "nookWidth") as? Double ?? 210
-        let configuredWidth = min(max(storedWidth, 170), 280)
         let systemNotchWidth = measuredNotchWidth(on: screen) ?? 0
-        let restingWidth = max(systemNotchWidth, configuredWidth)
-        let mediaWidth = min(max(360 + configuredWidth - 210, 320), 430)
+        let restingWidth = max(systemNotchWidth, 210)
+        // Overlay windows do not make macOS reflow menu-bar extras like a physical
+        // notch does. Keep music mode within roughly one status-item slot on each
+        // side of the real notch so adjacent icons remain wholly visible.
+        let preferredMediaWidth: CGFloat = 300
+        let menuBarSafeWidth = systemNotchWidth > 0 ? systemNotchWidth + 96 : 320
+        let mediaWidth = max(restingWidth, min(preferredMediaWidth, menuBarSafeWidth))
         let width = model.media.isPlaying ? max(restingWidth, mediaWidth) : restingWidth
         return NSSize(width: width, height: measuredCompactHeight(on: screen))
     }

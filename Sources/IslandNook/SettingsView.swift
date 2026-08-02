@@ -3,7 +3,6 @@ import ServiceManagement
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("nookWidth") private var nookWidth = 210.0
     @AppStorage("accentName") private var accentName = "紫罗兰"
     @AppStorage("expandOnHover") private var expandOnHover = true
     @AppStorage("launchAtLogin") private var launchAtLogin = false
@@ -14,7 +13,6 @@ struct SettingsView: View {
             Form {
                 Section("外观") {
                     Picker("强调色", selection: $accentName) { ForEach(["紫罗兰", "海蓝", "薄荷", "日落"], id: \.self) { Text($0) } }
-                    Slider(value: $nookWidth, in: 170...280, step: 5) { Text("收起宽度") } minimumValueLabel: { Text("窄") } maximumValueLabel: { Text("宽") }
                     Toggle("鼠标悬停时自动展开", isOn: $expandOnHover)
                 }
                 Section("行为") {

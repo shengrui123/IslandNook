@@ -36,10 +36,8 @@ private struct MediaCard: View {
                     }
                 }.frame(width: 104, height: 104).clipShape(RoundedRectangle(cornerRadius: 16))
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
-                        if let icon = model.media.playerIcon { Image(nsImage: icon).resizable().scaledToFit().frame(width: 13, height: 13) }
-                        Text(model.media.player?.rawValue.uppercased() ?? "NOW PLAYING")
-                    }.font(.caption2.bold()).tracking(1).foregroundStyle(accent)
+                    Text(model.media.player?.rawValue.uppercased() ?? "NOW PLAYING")
+                        .font(.caption2.bold()).tracking(1).foregroundStyle(accent)
                     Text(model.media.title).font(.title3.bold()).lineLimit(2)
                     Text(model.media.artist).font(.subheadline).foregroundStyle(.white.opacity(0.55)).lineLimit(1)
                 }

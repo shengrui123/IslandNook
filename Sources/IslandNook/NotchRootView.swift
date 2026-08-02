@@ -100,22 +100,12 @@ private struct CompactNook: View {
     var body: some View {
         HStack(spacing: 9) {
             if model.media.isPlaying {
-                CompactArtwork(accent: accent)
-                .frame(width: max(model.compactHeight - 12, 22), height: max(model.compactHeight - 12, 22))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(model.media.title)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        if let icon = model.media.playerIcon {
-                            Image(nsImage: icon).resizable().scaledToFit().frame(width: 10, height: 10)
-                        }
-                        Text("\(model.media.player?.rawValue ?? "音乐") · \(model.media.artist)")
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .lineLimit(1)
-                    }
+                if let artwork = model.media.artwork {
+                    Image(nsImage: artwork)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: max(model.compactHeight - 12, 22), height: max(model.compactHeight - 12, 22))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
                 }
             } else {
                 Circle().fill(.gray.opacity(0.6)).frame(width: 7, height: 7)
@@ -134,25 +124,6 @@ private struct CompactNook: View {
         }
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct CompactArtwork: View {
-    @Environment(AppModel.self) private var model
-    let accent: Color
-
-    var body: some View {
-        Group {
-            if let artwork = model.media.artwork {
-                Image(nsImage: artwork).resizable().scaledToFill()
-            } else {
-                ZStack {
-                    LinearGradient(colors: [accent, .blue.opacity(0.75)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Image(systemName: "music.note").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
-                }
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 }
 

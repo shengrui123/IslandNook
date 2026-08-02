@@ -31,6 +31,7 @@ final class MediaController {
     private var artworkKey = ""
     private var artworkLoadingKey = ""
     private var artworkTask: Task<Void, Never>?
+    private var artworkFingerprint: Int?
     private var lyricsKey = ""
     private var lyricsTask: Task<Void, Never>?
 
@@ -54,14 +55,17 @@ final class MediaController {
     private func refresh() {
         if update(player: .spotify) { return }
         if update(player: .music) { return }
-        player = nil; title = "未在播放"; artist = "打开 Music 或 Spotify"; album = ""; artwork = nil; artworkColors = ArtworkPalette.fallback; playerIcon = nil; artworkKey = ""; artworkLoadingKey = ""; artworkTask?.cancel(); lyricsKey = ""; lyrics = []; lyricsStatus = "播放音乐后显示歌词"; playbackPosition = 0; trackDuration = 0; isPlaying = false
+        player = nil; title = "未在播放"; artist = "打开 Music 或 Spotify"; album = ""; artwork = nil; artworkColors = ArtworkPalette.fallback; playerIcon = nil; artworkKey = ""; artworkLoadingKey = ""; artworkFingerprint = nil; artworkTask?.cancel(); lyricsKey = ""; lyrics = []; lyricsStatus = "播放音乐后显示歌词"; playbackPosition = 0; trackDuration = 0; isPlaying = false
     }
 
     @discardableResult
     private func update(player target: Player) -> Bool {
         let bundleIdentifier = target == .music ? "com.apple.Music" : "com.spotify.client"
         guard let runningApp = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleIdentifier }) else { return false }
+        if target == .music { return updateMusic(runningApp: runningApp) }
+
         let artworkLine = target == .spotify ? "set artURL to artwork url of current track" : "set artURL to \"\""
+        let identityLine = target == .spotify ? "set trackID to id of current track" : "set trackID to persistent ID of current track"
         let script = """
         tell application \"\(target.rawValue)\"
           if player state is stopped then return \"STOPPED\"
@@ -71,29 +75,76 @@ final class MediaController {
           set pos to player position
           set dur to duration of current track
           \(artworkLine)
-          return (player state as text) & \"|||\" & t & \"|||\" & a & \"|||\" & al & \"|||\" & artURL & \"|||\" & pos & \"|||\" & dur
+          \(identityLine)
+          return (player state as text) & \"|||\" & t & \"|||\" & a & \"|||\" & al & \"|||\" & artURL & \"|||\" & trackID & \"|||\" & pos & \"|||\" & dur
         end tell
         """
         guard let result = NSAppleScript(source: script)?.executeAndReturnError(nil).stringValue, result != "STOPPED" else { return false }
         let parts = result.components(separatedBy: "|||")
-        guard parts.count >= 7 else { return false }
+        guard parts.count >= 8 else { return false }
         player = target
         playerIcon = runningApp.icon
         isPlaying = parts[0].lowercased().contains("playing")
         title = parts[1]
         artist = parts[2]
         album = parts[3]
-        playbackPosition = Double(parts[5]) ?? playbackPosition
+        playbackPosition = Double(parts[6]) ?? playbackPosition
         positionUpdatedAt = Date()
-        let reportedDuration = Double(parts[6]) ?? 0
+        let reportedDuration = Double(parts[7]) ?? 0
         trackDuration = reportedDuration > 10_000 ? reportedDuration / 1_000 : reportedDuration
-        let trackKey = "\(target.rawValue)|\(title)|\(artist)|\(album)"
-        if target == .spotify {
-            loadRemoteArtwork(parts[4], trackKey: trackKey)
-        } else {
-            loadMusicArtwork(trackKey: trackKey)
-        }
+        let trackID = parts[5]
+        let trackKey = "\(target.rawValue)|\(trackID)"
+        loadRemoteArtwork(parts[4], trackKey: trackKey)
         loadLyricsIfNeeded(trackKey: trackKey, player: target)
+        return true
+    }
+
+    private func updateMusic(runningApp: NSRunningApplication) -> Bool {
+        let script = """
+        tell application "Music"
+          if player state is stopped then return missing value
+          set musicTrack to current track
+          set artworkData to missing value
+          try
+            set artworkData to data of artwork 1 of musicTrack
+          end try
+          return {(player state as text), (name of musicTrack), (artist of musicTrack), (album of musicTrack), (persistent ID of musicTrack), (player position), (duration of musicTrack), artworkData}
+        end tell
+        """
+        guard let snapshot = NSAppleScript(source: script)?.executeAndReturnError(nil),
+              snapshot.numberOfItems >= 8,
+              let state = snapshot.atIndex(1)?.stringValue,
+              let currentTitle = snapshot.atIndex(2)?.stringValue,
+              let currentArtist = snapshot.atIndex(3)?.stringValue,
+              let currentAlbum = snapshot.atIndex(4)?.stringValue,
+              let persistentID = snapshot.atIndex(5)?.stringValue else { return false }
+
+        player = .music
+        playerIcon = runningApp.icon
+        isPlaying = state.lowercased().contains("playing")
+        title = currentTitle
+        artist = currentArtist
+        album = currentAlbum
+        playbackPosition = Double(snapshot.atIndex(6)?.stringValue ?? "") ?? playbackPosition
+        positionUpdatedAt = Date()
+        let reportedDuration = Double(snapshot.atIndex(7)?.stringValue ?? "") ?? 0
+        trackDuration = reportedDuration > 10_000 ? reportedDuration / 1_000 : reportedDuration
+
+        let trackKey = "Music|\(persistentID)"
+        if let artworkDescriptor = snapshot.atIndex(8),
+           let image = NSImage(data: artworkDescriptor.data) {
+            let fingerprint = image.tiffRepresentation?.hashValue ?? artworkDescriptor.data.hashValue
+            if artworkKey != trackKey || artworkFingerprint != fingerprint {
+                artworkTask?.cancel()
+                artworkLoadingKey = ""
+                artworkKey = trackKey
+                artworkFingerprint = fingerprint
+                setArtwork(image)
+            }
+        } else {
+            loadMusicArtworkFallback(trackKey: trackKey)
+        }
+        loadLyricsIfNeeded(trackKey: trackKey, player: .music)
         return true
     }
 
@@ -162,27 +213,37 @@ final class MediaController {
             self.artworkLoadingKey = ""
             guard let image else { return }
             self.artworkKey = trackKey
+            self.artworkFingerprint = image.tiffRepresentation?.hashValue
             self.setArtwork(image)
         }
     }
 
-    private func loadMusicArtwork(trackKey: String) {
-        guard artworkKey != trackKey else { return }
-        if artworkLoadingKey != trackKey { prepareArtworkLoad(for: trackKey) }
-        let script = """
-        tell application "Music"
-          try
-            return data of artwork 1 of current track
-          on error
-            return missing value
-          end try
-        end tell
-        """
-        guard let descriptor = NSAppleScript(source: script)?.executeAndReturnError(nil),
-              let image = NSImage(data: descriptor.data) else { return }
-        artworkLoadingKey = ""
-        artworkKey = trackKey
-        setArtwork(image)
+    private func loadMusicArtworkFallback(trackKey: String) {
+        guard artworkKey != trackKey, artworkLoadingKey != trackKey else { return }
+        let requestedTitle = title
+        let requestedArtist = artist
+        let requestedAlbum = album
+        let requestedDuration = trackDuration
+        prepareArtworkLoad(for: trackKey)
+        artworkTask = Task { [weak self] in
+            if let image = await AppleArtworkService.fetch(
+                title: requestedTitle,
+                artist: requestedArtist,
+                album: requestedAlbum,
+                duration: requestedDuration
+            ) {
+                guard !Task.isCancelled,
+                      let self,
+                      self.artworkLoadingKey == trackKey else { return }
+                self.artworkLoadingKey = ""
+                self.artworkKey = trackKey
+                self.artworkFingerprint = image.tiffRepresentation?.hashValue
+                self.setArtwork(image)
+                return
+            }
+            guard let self, self.artworkLoadingKey == trackKey else { return }
+            self.artworkLoadingKey = ""
+        }
     }
 
     private func prepareArtworkLoad(for trackKey: String) {

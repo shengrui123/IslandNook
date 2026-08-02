@@ -22,11 +22,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsController: NSWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         NSApp.setActivationPolicy(.accessory)
         panelController = NotchPanelController(model: model)
         panelController?.show()
         installStatusItem()
+        DispatchQueue.main.async { [weak self] in self?.hideRestoredSettingsWindows() }
     }
+
+    func applicationShouldSaveApplicationState(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldRestoreApplicationState(_ sender: NSApplication) -> Bool { false }
 
     func applicationWillTerminate(_ notification: Notification) {
         model.stopServices()
@@ -60,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             window.title = "IslandNook 设置"
             window.isReleasedWhenClosed = false
+            window.isRestorable = false
             window.center()
             window.setFrameAutosaveName("IslandNookSettings")
             window.contentView = NSHostingView(rootView: SettingsView().environment(model))
@@ -68,6 +74,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsController?.showWindow(nil)
         settingsController?.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func hideRestoredSettingsWindows() {
+        for window in NSApp.windows where window.styleMask.contains(.titled) {
+            window.orderOut(nil)
+        }
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
